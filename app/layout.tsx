@@ -1,6 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import './globals.css'
+import './global.css'
 
 export const metadata: Metadata = {
   title: 'Assistant Chat',

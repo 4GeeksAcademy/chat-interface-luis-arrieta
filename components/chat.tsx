@@ -5,14 +5,6 @@ import { Bot, SendHorizontal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ChatMessage, type ChatMessageData } from '@/components/chat-message'
 
-const SAMPLE_REPLIES = [
-  "That's a great question. Let me walk you through it step by step.",
-  "Here's what I'd suggest based on what you've shared.",
-  'Got it! I can help with that. Could you tell me a bit more?',
-  'Interesting — there are a few ways to approach this.',
-  'Absolutely. Here is a concise summary for you.',
-]
-
 function createId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
@@ -24,7 +16,6 @@ export function Chat() {
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -40,13 +31,7 @@ export function Chat() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [input])
 
-  useEffect(() => {
-    return () => {
-      if (replyTimer.current) clearTimeout(replyTimer.current)
-    }
-  }, [])
-
-  function sendMessage() {
+  async function sendMessage() {
     const text = input.trim()
     if (!text || isThinking) return
 
@@ -55,19 +40,47 @@ export function Chat() {
       role: 'user',
       content: text,
     }
-    setMessages((prev) => [...prev, userMessage])
+
+    const nextMessages = [...messages, userMessage]
+
+    setMessages(nextMessages)
     setInput('')
     setIsThinking(true)
 
-    replyTimer.current = setTimeout(() => {
-      const reply =
-        SAMPLE_REPLIES[Math.floor(Math.random() * SAMPLE_REPLIES.length)]
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: nextMessages.map(({ role, content }) => ({
+            role,
+            content,
+          })),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo obtener una respuesta')
+      }
+
       setMessages((prev) => [
         ...prev,
-        { id: createId(), role: 'assistant', content: reply },
+        { id: createId(), role: 'assistant', content: data.message.content },
       ])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createId(),
+          role: 'assistant',
+          content: 'No pude responder en este momento. Inténtalo de nuevo.',
+        },
+      ])
+    } finally {
       setIsThinking(false)
-    }, 1400)
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -79,7 +92,6 @@ export function Chat() {
   }
 
   function clearConversation() {
-    if (replyTimer.current) clearTimeout(replyTimer.current)
     setMessages([])
     setIsThinking(false)
   }
