@@ -5,6 +5,17 @@ interface ChatRequestMessage {
   content: string
 }
 
+interface GroqResponse {
+  choices?: Array<{ message?: { content?: string } }>
+  error?: { message?: string }
+  model?: string
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { messages } = (await request.json()) as {
@@ -42,7 +53,7 @@ export async function POST(request: Request) {
       },
     )
 
-    const data = await groqResponse.json()
+    const data = (await groqResponse.json()) as GroqResponse
 
     if (!groqResponse.ok) {
       return NextResponse.json(
@@ -60,7 +71,15 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ message: { role: 'assistant', content } })
+    return NextResponse.json({
+      message: { role: 'assistant', content },
+      usage: {
+        prompt_tokens: data.usage?.prompt_tokens ?? 0,
+        completion_tokens: data.usage?.completion_tokens ?? 0,
+        total_tokens: data.usage?.total_tokens ?? 0,
+      },
+      model: data.model ?? 'unknown',
+    })
   } catch {
     return NextResponse.json(
       { error: 'No se pudo conectar con Groq' },
